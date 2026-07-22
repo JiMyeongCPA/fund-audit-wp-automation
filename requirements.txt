@@ -1,0 +1,9 @@
+pandas
+openpyxl
+google-genai
+numpy
+pypdf
+fastapi
+uvicorn
+python-dotenv
+pywin32; sys_platform == "win32"

@@ -1,0 +1,33 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# GEMINI_API_KEY 등 로컬 자격증명 -- 절대 커밋하지 않는다.
+.env
+
+# Real fund data (uncertain provenance) -- never published. The public,
+# name-anonymized stand-in lives in sample_data/ (see scripts/make_sample_data.py)
+# and is committed normally.
+#
+# Exception: tests/fixtures/synthetic_pbc/ is the 수수료비용 AI-search demo
+# corpus (fee_contract_*.pdf + manifest) -- 100% synthetic, invented fund/
+# company names, no real data at all. It's excluded from the blanket ignore
+# below so it stays committed.
+tests/fixtures/*
+!tests/fixtures/synthetic_pbc
+
+# Build artifacts from the real-data run (run_demo.py) -- regenerate locally
+# with `python run_demo.py`. The shareable equivalent is sample_output/,
+# produced by run_sample_demo.py, which IS committed.
+output/
+
+# Frontend (React) build tooling.
+frontend/node_modules/
+frontend/dist/
+
+# Stray local debug dump, not part of the deliverable.
+jibun_dump.txt
+
+# Leftover Excel COM automation temp/lock artifacts (8-char hex filenames,
+# no extension) from _recalculate_with_excel in api.py.
+sample_output/[0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F]
