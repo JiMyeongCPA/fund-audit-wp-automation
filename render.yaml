@@ -1,0 +1,15 @@
+# Render Blueprint. GitHub 저장소를 Render에 연결하면 이 파일을 읽어
+# 도커 이미지를 빌드·배포한다(프론트+백엔드 단일 서비스).
+services:
+  - type: web
+    name: fund-audit-wp-automation
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/build-status
+    envVars:
+      # 승인형 항목은 기본적으로 결정론적 폴백 제안을 쓴다(무료 데모에서
+      # 안정적으로 동작). 넉넉한 Gemini 키가 있으면 Render 대시보드에서
+      # USE_LIVE_AI=1 과 GEMINI_API_KEY 를 추가해 실시간 AI로 켤 수 있다.
+      - key: USE_LIVE_AI
+        value: "0"

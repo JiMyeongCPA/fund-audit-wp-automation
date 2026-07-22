@@ -145,7 +145,7 @@ function App() {
   if (error) {
     return (
       <div className="p-3 text-sm text-destructive">
-        {error} — 백엔드(http://localhost:8000)가 실행 중인지 확인하세요.
+        {error} — 백엔드 API가 응답하지 않습니다. 잠시 후 다시 시도해 주세요.
       </div>
     )
   }

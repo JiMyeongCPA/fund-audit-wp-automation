@@ -1,6 +1,10 @@
 import type { ReviewRow } from "./types"
 
-const API_BASE = "http://localhost:8000"
+// 상대 경로("")로 같은 오리진의 백엔드를 호출한다 -- 배포 시 FastAPI가
+// 이 프론트(dist)를 같이 서빙하므로 별도 호스트/CORS가 필요 없다. 로컬 개발
+// (vite dev, 5173)에서는 vite.config.ts의 /api 프록시가 localhost:8000으로
+// 넘겨준다.
+const API_BASE = ""
 
 export function documentUrl(docName: string): string {
   return `${API_BASE}/api/documents/${encodeURIComponent(docName)}`

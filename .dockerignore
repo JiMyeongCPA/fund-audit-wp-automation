@@ -1,0 +1,12 @@
+# 도커 빌드 컨텍스트에서 제외 -- 이미지에 안 들어가고 빌드도 빨라진다.
+.git
+frontend/node_modules
+frontend/dist
+__pycache__
+**/__pycache__
+*.pyc
+.pytest_cache
+.env
+output
+jibun_dump.txt
+docs/screenshots

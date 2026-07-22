@@ -30,6 +30,7 @@ import openpyxl
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from core.sheet_copy import copy_sheet
@@ -500,6 +501,22 @@ def _strip_xlsx_metadata(path: Path) -> None:
             tmp.unlink()
 
 
+def _excel_com_available() -> bool:
+    """이 환경에서 Excel COM 재계산(_recalculate_with_excel)이 가능한지.
+    Windows + pywin32 + 로컬 Excel이 있어야 한다. 리눅스 배포(Render 등)에서는
+    False -- 이때는 커밋된 sample_output/조립결과.xlsx(값까지 캐싱된 완성본)를
+    다시 만들지 않고 그대로 서빙한다. DISABLE_EXCEL_COM=1 로 명시적으로 끌 수도
+    있다(리눅스 배포 흐름을 윈도우에서 테스트하거나, 로컬에서도 pre-built
+    데모로 강제하고 싶을 때)."""
+    if os.environ.get("DISABLE_EXCEL_COM") == "1":
+        return False
+    try:
+        import win32com.client  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
 def _recalculate_with_excel(path: Path) -> None:
     """build_workpaper()는 수식만 써넣고 계산된 값은 저장하지 않는다 -- "엑셀이
     열 때 알아서 재계산한다"는 전제로 만들어진 설계라, 실제 엑셀에서 열면
@@ -604,6 +621,14 @@ def run_build(
                 paths[field] = SAMPLE_DATA_DIR / sample_filename
 
         BUILD_OUTPUT_PATH.parent.mkdir(exist_ok=True)
+        # Excel COM 재계산이 가능한 환경(Windows+Excel)에서만 실제로 조립본을
+        # 새로 써서 값을 채운다. 리눅스 배포처럼 COM이 없는 곳에서는 build_workpaper가
+        # 수식만 넣고 값은 못 채우므로(모든 숫자 셀이 빈 값), 조립본을 새로 쓰지 않고
+        # 커밋된 pre-built 완성본(값까지 캐싱됨)을 그대로 서빙한다. build_workpaper는
+        # 파이프라인이 실제로 도는지 확인하고 report(신규계정 등)를 얻기 위해 임시
+        # 파일에 돌린다 -- 표시용 파일과 분리.
+        com_available = _excel_com_available()
+        build_target = BUILD_OUTPUT_PATH if com_available else (tmp / "_build_probe.xlsx")
         try:
             report = build_workpaper(
                 paths["gijunkagyeok"],
@@ -618,14 +643,17 @@ def run_build(
                 paths["ilbyeoljasan"],
                 paths["seoljeongheji"],
                 paths["reference_workpaper"],
-                BUILD_OUTPUT_PATH,
+                build_target,
             )
         except Exception as e:  # noqa: BLE001
             raise HTTPException(500, f"조립 실패: {e}") from e
 
-    _add_pbc_divider_sheet(BUILD_OUTPUT_PATH)
-    _recalculate_with_excel(BUILD_OUTPUT_PATH)
-    _strip_xlsx_metadata(BUILD_OUTPUT_PATH)  # Excel 재계산이 박은 작성자명 제거
+    if com_available:
+        # 방금 새로 조립한 파일을 후처리(구분시트 추가 → 값 재계산 → 작성자명 제거).
+        _add_pbc_divider_sheet(BUILD_OUTPUT_PATH)
+        _recalculate_with_excel(BUILD_OUTPUT_PATH)
+        _strip_xlsx_metadata(BUILD_OUTPUT_PATH)  # Excel 재계산이 박은 작성자명 제거
+    # else: 커밋된 완성본은 이미 구분시트+값+메타정리가 끝난 상태라 손대지 않는다.
     _reset_workpaper_cache()
     _init_store(report, use_ai=USE_LIVE_AI)
     # 특수관계자거래/담보제공자산 값은 시트에 쓰지 않고 오버레이로만 계산해둔다
@@ -748,3 +776,33 @@ def download_workpaper():
             )
         },
     )
+
+
+# ---- 프론트엔드(React) 정적 서빙 -----------------------------------------
+# 배포 시 프론트와 백엔드를 한 서비스로 합친다: Vite로 빌드한 frontend/dist를
+# 이 FastAPI 앱이 직접 서빙하면 URL 하나·CORS 불필요·관리 지점 하나로 끝난다.
+# 로컬 개발(vite dev로 5173에서 따로 띄우는 경우)에는 dist가 없을 수 있으니,
+# 존재할 때만 마운트한다. 이 블록은 모든 /api 라우트가 등록된 뒤(파일 맨 끝)
+# 실행되어야 catch-all이 API를 가리지 않는다.
+_FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
+if _FRONTEND_DIST.is_dir():
+    _INDEX_HTML = _FRONTEND_DIST / "index.html"
+
+    # 해시된 정적 자산(js/css/이미지)은 /assets 아래에 있다.
+    app.mount(
+        "/assets",
+        StaticFiles(directory=str(_FRONTEND_DIST / "assets")),
+        name="assets",
+    )
+
+    @app.get("/{full_path:path}")
+    def _spa_fallback(full_path: str):
+        """SPA 라우팅용 catch-all: /api로 시작하지 않는 모든 경로는 index.html을
+        돌려줘 클라이언트 라우터(/review, /complete 등)가 처리하게 한다. 실제
+        파일(favicon 등)이 dist에 있으면 그 파일을 우선 준다."""
+        if full_path.startswith("api/"):
+            raise HTTPException(404, "not found")
+        candidate = (_FRONTEND_DIST / full_path).resolve()
+        if _FRONTEND_DIST in candidate.parents and candidate.is_file():
+            return FileResponse(str(candidate))
+        return FileResponse(str(_INDEX_HTML))
