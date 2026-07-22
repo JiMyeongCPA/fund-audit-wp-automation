@@ -1,0 +1,11 @@
+{
+  "account_name": "특수관계자거래",
+  "reason": "집합투자업자 및 그 특수관계자와의 거래는 이사회 승인 근거를 확인해야 하는 항목입니다.",
+  "search_query": "특수관계자와의 거래 내역 및 이사회 승인 근거",
+  "doc_paths": [
+    "tests/fixtures/synthetic_pbc/teuksu_이사회_특수관계자거래_승인확인서.pdf",
+    "tests/fixtures/synthetic_pbc/teuksu_일반용역계약서_전산시스템유지보수.pdf",
+    "tests/fixtures/synthetic_pbc/teuksu_감사위원회_회의록_내부통제.pdf"
+  ],
+  "note": "합성 데모 자료입니다. 실제 이사회 회의록이 아니며, AI 근거검색 기능의 개념 증명을 위해 작성되었습니다."
+}

@@ -1,0 +1,11 @@
+{
+  "account_name": "담보제공자산",
+  "reason": "신탁재산 중 담보로 제공된 유가증권 내역은 원본 자료가 없어 자동 산출이 불가능해 확인이 필요합니다.",
+  "search_query": "보유 유가증권 중 담보로 제공된 내역",
+  "doc_paths": [
+    "tests/fixtures/synthetic_pbc/dambo_유가증권_담보제공_약정서.pdf",
+    "tests/fixtures/synthetic_pbc/dambo_유가증권_보관위탁계약서.pdf",
+    "tests/fixtures/synthetic_pbc/dambo_환매조건부매도_약정서.pdf"
+  ],
+  "note": "합성 데모 자료입니다. 실제 약정서가 아니며, AI 근거검색 기능의 개념 증명을 위해 작성되었습니다."
+}

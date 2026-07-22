@@ -1,0 +1,14 @@
+{
+  "account_name": "수수료비용",
+  "reason": "전기 대비 수수료비용 변동 폭이 커 위탁운용보수율 조항 개정 여부 확인이 필요합니다.",
+  "search_query": "수수료비용(위탁운용보수) 조항의 요율 변경 근거",
+  "doc_paths": [
+    "tests/fixtures/synthetic_pbc/fee_contract_전기_보수조항.pdf",
+    "tests/fixtures/synthetic_pbc/fee_contract_당기_보수조항_개정.pdf",
+    "tests/fixtures/synthetic_pbc/fee_contract_환매수수료조항.pdf",
+    "tests/fixtures/synthetic_pbc/fee_contract_신탁보수조항.pdf",
+    "tests/fixtures/synthetic_pbc/fee_contract_판매보수조항.pdf",
+    "tests/fixtures/synthetic_pbc/fee_contract_성과보수조항.pdf"
+  ],
+  "note": "합성 데모 자료입니다. 실제 펀드 계약서가 아니며, AI 근거검색 기능의 개념 증명을 위해 작성되었습니다."
+}
