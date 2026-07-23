@@ -517,6 +517,21 @@ def _excel_com_available() -> bool:
     return True
 
 
+_PREBUILT_REPORT_PATH = PROJECT_ROOT / "sample_output" / "build_report.json"
+
+
+def _load_prebuilt_report() -> dict:
+    """no-COM(배포) 경로에서 build_workpaper()를 돌리는 대신 읽는, 표본 조립의
+    사전 계산된 report(신규계정/드리프트 목록). 로컬에서 실제 표본을 조립해 뽑아
+    커밋해둔 파일이라 값이 실제 산출물과 일치한다. 없으면 빈 report로 폴백."""
+    import json
+
+    try:
+        return json.loads(_PREBUILT_REPORT_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"missing_account_codes": [], "drifted_prior_year_rows": []}
+
+
 def _recalculate_with_excel(path: Path) -> None:
     """build_workpaper()는 수식만 써넣고 계산된 값은 저장하지 않는다 -- "엑셀이
     열 때 알아서 재계산한다"는 전제로 만들어진 설계라, 실제 엑셀에서 열면
@@ -607,53 +622,55 @@ def run_build(
         "reference_workpaper": reference_workpaper,
     }
 
-    with tempfile.TemporaryDirectory() as tmp_str:
-        tmp = Path(tmp_str)
-        paths: dict[str, Path] = {}
-        for field, sample_filename in SAMPLE_BUILD_INPUTS.items():
-            upload = uploads[field]
-            if upload is not None:
-                dest = tmp / upload.filename
-                with open(dest, "wb") as out:
-                    shutil.copyfileobj(upload.file, out)
-                paths[field] = dest
-            else:
-                paths[field] = SAMPLE_DATA_DIR / sample_filename
-
-        BUILD_OUTPUT_PATH.parent.mkdir(exist_ok=True)
-        # Excel COM 재계산이 가능한 환경(Windows+Excel)에서만 실제로 조립본을
-        # 새로 써서 값을 채운다. 리눅스 배포처럼 COM이 없는 곳에서는 build_workpaper가
-        # 수식만 넣고 값은 못 채우므로(모든 숫자 셀이 빈 값), 조립본을 새로 쓰지 않고
-        # 커밋된 pre-built 완성본(값까지 캐싱됨)을 그대로 서빙한다. build_workpaper는
-        # 파이프라인이 실제로 도는지 확인하고 report(신규계정 등)를 얻기 위해 임시
-        # 파일에 돌린다 -- 표시용 파일과 분리.
-        com_available = _excel_com_available()
-        build_target = BUILD_OUTPUT_PATH if com_available else (tmp / "_build_probe.xlsx")
-        try:
-            report = build_workpaper(
-                paths["gijunkagyeok"],
-                paths["gungnaeyudong"],
-                paths["gungnaejusik"],
-                paths["pundbyeolmyeongse"],
-                paths["sooikjeunggwon"],
-                paths["seonmul"],
-                paths["chaegwon"],
-                paths["gajungpyeonggyunjwasu"],
-                paths["bosubunbae"],
-                paths["ilbyeoljasan"],
-                paths["seoljeongheji"],
-                paths["reference_workpaper"],
-                build_target,
-            )
-        except Exception as e:  # noqa: BLE001
-            raise HTTPException(500, f"조립 실패: {e}") from e
-
+    BUILD_OUTPUT_PATH.parent.mkdir(exist_ok=True)
+    # Excel COM 재계산이 가능한 환경(Windows+Excel)에서만 실제로 조립본을 새로
+    # 써서 값을 채운다. 리눅스 배포처럼 COM이 없는 곳에서는 (1) build_workpaper가
+    # 수식만 넣고 값은 못 채우고, (2) 12개 CSV를 pandas로 읽어 24시트 워크북을
+    # 메모리에 만드는 조립 자체가 무거워 무료 인스턴스(512MB)에서 OOM으로 죽는다.
+    # 그래서 no-COM 경로에서는 조립을 아예 돌리지 않고, 커밋된 pre-built 완성본
+    # (값까지 캐싱됨)을 그대로 서빙하고 report는 사전 계산된 JSON을 읽는다 --
+    # 화면에 보이는 데이터는 어차피 이 완성본이고, 검토 항목(특수관계자거래/
+    # 담보제공자산)은 report가 아니라 데모 매니페스트에서 나온다.
+    com_available = _excel_com_available()
     if com_available:
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            paths: dict[str, Path] = {}
+            for field, sample_filename in SAMPLE_BUILD_INPUTS.items():
+                upload = uploads[field]
+                if upload is not None:
+                    dest = tmp / upload.filename
+                    with open(dest, "wb") as out:
+                        shutil.copyfileobj(upload.file, out)
+                    paths[field] = dest
+                else:
+                    paths[field] = SAMPLE_DATA_DIR / sample_filename
+            try:
+                report = build_workpaper(
+                    paths["gijunkagyeok"],
+                    paths["gungnaeyudong"],
+                    paths["gungnaejusik"],
+                    paths["pundbyeolmyeongse"],
+                    paths["sooikjeunggwon"],
+                    paths["seonmul"],
+                    paths["chaegwon"],
+                    paths["gajungpyeonggyunjwasu"],
+                    paths["bosubunbae"],
+                    paths["ilbyeoljasan"],
+                    paths["seoljeongheji"],
+                    paths["reference_workpaper"],
+                    BUILD_OUTPUT_PATH,
+                )
+            except Exception as e:  # noqa: BLE001
+                raise HTTPException(500, f"조립 실패: {e}") from e
         # 방금 새로 조립한 파일을 후처리(구분시트 추가 → 값 재계산 → 작성자명 제거).
         _add_pbc_divider_sheet(BUILD_OUTPUT_PATH)
         _recalculate_with_excel(BUILD_OUTPUT_PATH)
         _strip_xlsx_metadata(BUILD_OUTPUT_PATH)  # Excel 재계산이 박은 작성자명 제거
-    # else: 커밋된 완성본은 이미 구분시트+값+메타정리가 끝난 상태라 손대지 않는다.
+    else:
+        # 커밋된 완성본은 이미 구분시트+값+메타정리가 끝난 상태라 손대지 않고,
+        # report는 같은 표본을 로컬에서 조립해 미리 뽑아둔 JSON을 읽는다.
+        report = _load_prebuilt_report()
     _reset_workpaper_cache()
     _init_store(report, use_ai=USE_LIVE_AI)
     # 특수관계자거래/담보제공자산 값은 시트에 쓰지 않고 오버레이로만 계산해둔다
